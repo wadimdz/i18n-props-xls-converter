@@ -27,7 +27,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,11 +36,13 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.RegexFileFilter;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.everit.i18n.propsxlsconverter.I18nConverter;
+import org.everit.i18n.propsxlsconverter.internal.dto.PropFile;
 import org.everit.i18n.propsxlsconverter.internal.dto.PropKeyRowNumberDTO;
 import org.everit.i18n.propsxlsconverter.internal.dto.WorkbookRowDTO;
 import org.everit.i18n.propsxlsconverter.internal.workbook.WorkbookReader;
@@ -51,8 +52,6 @@ import org.everit.i18n.propsxlsconverter.internal.workbook.WorkbookWriter;
  * The {@link I18nConverter} implementation.
  */
 public class I18nConverterImpl implements I18nConverter {
-
-  private static final int SEPARATOR_SIZE = 5;
 
   private static final String UNDERLINE = "_";
 
@@ -138,7 +137,7 @@ public class I18nConverterImpl implements I18nConverter {
     WorkbookWriter workbookWriter = new WorkbookWriter(xlsFileName, languages);
 
     if (files.isEmpty()) {
-      workbookWriter.writeWorkbookToFile();
+      workbookWriter.writeWorkbookToFile(); 
       return;
     }
 
@@ -146,25 +145,15 @@ public class I18nConverterImpl implements I18nConverter {
       String lang = getLanguage(file.getName(), languages);
       String fileAccess = calculateFileAccess(file, languages, workingDirectory);
 
-      try (FileInputStream fileInputStream = new FileInputStream(file);
-          InputStreamReader inputStreamReader =
-              new InputStreamReader(fileInputStream, StandardCharsets.UTF_8);
-          BufferedReader br = new BufferedReader(inputStreamReader)) {
-        String line = null;
-        while ((line = br.readLine()) != null) {
-          // ignore empty and comment lines
-          if (!"".equals(line) && (line.charAt(0) != '#')) {
-            String unescapedLine = StringEscapeUtils.unescapeJava(line);
-            int separatorIndex = getPropertySeparatorIndex(unescapedLine);
-            String propKey = unescapedLine.substring(0, separatorIndex);
-            String propValue = unescapedLine.substring(separatorIndex + 1);
-
-            insertOrUpdateWorkbookRow(workbookWriter, lang, fileAccess, propKey, propValue);
-          }
+      try {
+        PropFile pFile = new PropFile(file.getAbsolutePath());
+        for (String key : pFile.getKeys()) {
+          String value = pFile.getStringValue(key);
+          insertOrUpdateWorkbookRow(workbookWriter, lang, fileAccess, key, value);
         }
-      } catch (IOException e) {
-        throw new RuntimeException("Has problem with IO when try to load/process properties "
-            + "files.", e);
+      } catch (ConfigurationException e1) {
+          throw new RuntimeException("Has problem with IO when try to load/process properties "
+                  + "files.", e1);
       }
     }
 
@@ -232,11 +221,12 @@ public class I18nConverterImpl implements I18nConverter {
     return "";
   }
 
+  /*
   private int getPropertySeparatorIndex(final String unescapedLine) {
     int[] separators = new int[SEPARATOR_SIZE];
     int index = 0;
     separators[index++] = unescapedLine.indexOf('=');
-    separators[index++] = unescapedLine.indexOf(' ');
+    //separators[index++] = unescapedLine.indexOf(' ');
     separators[index++] = unescapedLine.indexOf(':');
     separators[index++] = unescapedLine.indexOf('\t');
     separators[index++] = unescapedLine.indexOf('\f');
@@ -249,7 +239,7 @@ public class I18nConverterImpl implements I18nConverter {
     throw new RuntimeException("Not find separator in the line. Unescaped line: [" + unescapedLine
         + "].");
   }
-
+*/
   @Override
   public void importFromXls(final String xlsFileName, final String workingDirectory) {
 
